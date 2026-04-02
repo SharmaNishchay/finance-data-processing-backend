@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,14 +9,19 @@ from app.models.base import Base
 from app.routers import dashboard, records, users
 from app.services.bootstrap import ensure_default_admin
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
 
-    async with AsyncSession(engine, expire_on_commit=False) as session:
-        await ensure_default_admin(session)
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            await ensure_default_admin(session)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Database startup initialization skipped: %s", exc)
     yield
 
 
